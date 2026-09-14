@@ -40,3 +40,18 @@ export const programAccountsInputSchema = z.object({
 });
 
 export type JsonRecord = Record<string, unknown>;
+
+export const evmChainSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).describe("Configured EVM network label, for example robinhood-mainnet");
+const evmAddressSchema = z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("EVM address");
+
+export const evmAddressInputSchema = z.object({ address: evmAddressSchema, chain: evmChainSchema });
+export const evmTransactionInputSchema = z.object({ hash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).describe("EVM transaction hash"), chain: evmChainSchema });
+export const evmAddressTransactionsInputSchema = z.object({
+  address: evmAddressSchema,
+  chain: evmChainSchema,
+  maxCount: z.number().int().min(1).max(1000).default(50),
+  pageKey: z.string().min(1).optional().describe("Alchemy page key from a previous result"),
+  direction: z.enum(["from", "to", "both"]).default("both").describe("Transfer direction; use from or to when paginating"),
+});
+export const evmTokenInputSchema = z.object({ address: evmAddressSchema, chain: evmChainSchema });
+export const evmContractInputSchema = z.object({ address: evmAddressSchema, chain: evmChainSchema });
