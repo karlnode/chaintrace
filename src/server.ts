@@ -1,10 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createEvmClients, type EvmClients } from "./evm/config.js";
-import { getEvmAddress, getEvmAddressTransactions, getEvmContract, getEvmContractInfo, getEvmToken, getEvmTransaction } from "./evm/tools.js";
+import { createChainstackTraceClient, type ChainstackTraceClient } from "./evm/chainstack.js";
+import { getEvmAddress, getEvmAddressTransactions, getEvmChains, getEvmContract, getEvmContractInfo, getEvmToken, getEvmTraceTransaction, getEvmTransaction } from "./evm/tools.js";
 import { ToolError } from "./shared/errors.js";
 import type { SolanaConnections } from "./solana/config.js";
 import { getAddress, getAddressSignatures, getProgramAccounts, getToken, getTransaction } from "./solana/tools.js";
-import { addressInputSchema, addressSignaturesInputSchema, evmAddressInputSchema, evmAddressTransactionsInputSchema, evmContractInputSchema, evmTokenInputSchema, evmTransactionInputSchema, programAccountsInputSchema, tokenInputSchema, transactionInputSchema } from "./types.js";
+import { addressInputSchema, addressSignaturesInputSchema, evmAddressInputSchema, evmAddressTransactionsInputSchema, evmContractInputSchema, evmListChainsInputSchema, evmTokenInputSchema, evmTraceTransactionInputSchema, evmTransactionInputSchema, programAccountsInputSchema, tokenInputSchema, transactionInputSchema } from "./types.js";
 
 function toolResponse(value: Record<string, unknown>) {
   return {
@@ -22,7 +23,7 @@ function toolFailure(error: unknown) {
   };
 }
 
-export function createServer(connections: SolanaConnections, evmClients: EvmClients = createEvmClients()): McpServer {
+export function createServer(connections: SolanaConnections, evmClients: EvmClients = createEvmClients(), chainstackClient: ChainstackTraceClient = createChainstackTraceClient()): McpServer {
   const server = new McpServer({ name: "chaintrace", version: "0.1.0" });
   server.registerTool(
     "solana_get_address",
@@ -85,9 +86,19 @@ export function createServer(connections: SolanaConnections, evmClients: EvmClie
     async (input) => { try { return toolResponse(await getEvmAddress(evmClients, input)); } catch (error) { return toolFailure(error); } },
   );
   server.registerTool(
+    "evm_list_chains",
+    { title: "List EVM chain labels", description: "List accepted Chainstack tracing networks and provider-label aliases. Call this before choosing a network label when uncertain.", inputSchema: evmListChainsInputSchema.shape },
+    async () => toolResponse(getEvmChains()),
+  );
+  server.registerTool(
     "evm_get_transaction",
     { title: "Get EVM transaction", description: "Get a full EVM transaction and receipt by hash, with raw RPC records.", inputSchema: evmTransactionInputSchema.shape },
     async (input) => { try { return toolResponse(await getEvmTransaction(evmClients, input)); } catch (error) { return toolFailure(error); } },
+  );
+  server.registerTool(
+    "evm_trace_transaction",
+    { title: "Trace EVM transaction", description: "Call Chainstack's trace_transaction RPC to expose flat internal calls, value transfers, creates, delegatecalls, and reverts. Available only where Chainstack documents trace_transaction.", inputSchema: evmTraceTransactionInputSchema.shape },
+    async (input) => { try { return toolResponse(await getEvmTraceTransaction(chainstackClient, input)); } catch (error) { return toolFailure(error); } },
   );
   server.registerTool(
     "evm_get_address_transactions",

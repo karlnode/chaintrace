@@ -2,7 +2,8 @@ import { decodeEventLog, decodeFunctionData, decodeFunctionResult, encodeFunctio
 import { ToolError } from "../shared/errors.js";
 import { jsonSafe } from "../shared/json.js";
 import type { JsonRecord } from "../types.js";
-import type { EvmClients } from "./config.js";
+import { alchemyChainAliases, type EvmClients } from "./config.js";
+import { chainstackTraceChains, traceResult, type ChainstackTraceClient } from "./chainstack.js";
 import { getSourcifyContract } from "./sourcify.js";
 
 const ERC20_ABI = [
@@ -39,6 +40,20 @@ function asEvmError(error: unknown): ToolError {
   return new ToolError(`EVM RPC request failed: ${error instanceof Error ? error.message : String(error)}`, "RPC_ERROR");
 }
 
+/** MCP-native discovery for provider labels and Chainstack trace capability. */
+export function getEvmChains(): JsonRecord {
+  return {
+    alchemy: {
+      chainInput: "Use Alchemy's network slug (for example bnb-mainnet). Other valid Alchemy slugs are passed through without a hard-coded registry and verified with eth_chainId.",
+      aliases: alchemyChainAliases(),
+    },
+    chainstackTrace: {
+      chainInput: "Use one of these labels with evm_trace_transaction. It selects the appropriate Chainstack endpoint and trace method.",
+      supported: chainstackTraceChains(),
+    },
+  };
+}
+
 export async function getEvmAddress(clients: EvmClients, input: { address: string; chain: string }): Promise<JsonRecord> {
   const account = address(input.address, "address");
   try {
@@ -67,6 +82,14 @@ export async function getEvmTransaction(clients: EvmClients, input: { hash: stri
     if (!transaction) throw new ToolError(`Transaction ${hash} was not found on ${input.chain}.`, "TRANSACTION_NOT_FOUND");
     const decoded = await decodeEvmTransaction(client, chainId, transaction, receipt);
     return { chain: input.chain, chainId, hash, transaction: jsonSafe(transaction), receipt: jsonSafe(receipt), decoded, raw: { chainId: rawChainId, transaction, receipt } };
+  } catch (error) { throw asEvmError(error); }
+}
+
+/** Get Chainstack's execution trace separately, so ordinary transaction reads stay fast and provider-agnostic. */
+export async function getEvmTraceTransaction(client: ChainstackTraceClient, input: { hash: string; chain: string }): Promise<JsonRecord> {
+  const hash = transactionHash(input.hash);
+  try {
+    return { chain: input.chain, hash, ...traceResult(await client.trace(input.chain, hash)) };
   } catch (error) { throw asEvmError(error); }
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alchemyRpcUrl, createEvmClients } from "../src/evm/config.js";
+import { alchemyRpcUrl, createEvmClients, normalizeAlchemyChain } from "../src/evm/config.js";
 
 describe("Alchemy EVM configuration", () => {
   it("constructs network endpoints from a chain slug and one API key", () => {
@@ -9,5 +9,10 @@ describe("Alchemy EVM configuration", () => {
 
   it("requires the single Alchemy API key", () => {
     expect(() => createEvmClients({}).get("shape-mainnet")).toThrow("ALCHEMY_API_KEY");
+  });
+
+  it("normalizes common BNB Smart Chain labels to Alchemy's network slug", () => {
+    expect(normalizeAlchemyChain("bsc-mainnet")).toBe("bnb-mainnet");
+    expect(normalizeAlchemyChain("binance-smart-chain")).toBe("bnb-mainnet");
   });
 });

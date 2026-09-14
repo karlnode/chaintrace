@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EvmClients } from "../src/evm/config.js";
-import { getEvmAddress, getEvmAddressTransactions, getEvmContract, getEvmContractInfo, getEvmToken, getEvmTransaction } from "../src/evm/tools.js";
+import type { ChainstackTraceClient } from "../src/evm/chainstack.js";
+import { getEvmAddress, getEvmAddressTransactions, getEvmContract, getEvmContractInfo, getEvmToken, getEvmTraceTransaction, getEvmTransaction } from "../src/evm/tools.js";
 
 const address = "0x000000000000000000000000000000000000dEaD";
 const hash = `0x${"a".repeat(64)}`;
@@ -19,6 +20,12 @@ describe("EVM tool handlers", () => {
   it("gets a transaction and receipt", async () => {
     const result = await getEvmTransaction(clients((method) => ({ eth_chainId: "0x1", eth_getTransactionByHash: { hash, from: address }, eth_getTransactionReceipt: { transactionHash: hash, status: "0x1" } } as Record<string, unknown>)[method]), { hash, chain: "robinhood-mainnet" });
     expect(result).toMatchObject({ chainId: "1", hash, receipt: { status: "0x1" } });
+  });
+
+  it("keeps Chainstack execution traces separate from ordinary transaction reads", async () => {
+    const traceClient: ChainstackTraceClient = { trace: async () => ({ endpointNetwork: "base-mainnet", method: "trace_transaction", result: [{ type: "call", action: { from: address, to: address, value: "0x1" }, traceAddress: [] }] }) };
+    const result = await getEvmTraceTransaction(traceClient, { hash, chain: "base-mainnet" });
+    expect(result).toMatchObject({ provider: "chainstack", internalCallCount: 1, internalCalls: [{ valueWei: "1" }], raw: { trace: [{ type: "call" }] } });
   });
 
   it("uses Alchemy indexed transfers for address history", async () => {
