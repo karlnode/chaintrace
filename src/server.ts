@@ -1,11 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createEvmClients, type EvmClients } from "./evm/config.js";
+import { getBridgeAddressActivity } from "./bridge/tools.js";
 import { createChainstackTraceClient, type ChainstackTraceClient } from "./evm/chainstack.js";
 import { getEvmAddress, getEvmAddressTransactions, getEvmChains, getEvmContract, getEvmContractInfo, getEvmToken, getEvmTraceTransaction, getEvmTransaction } from "./evm/tools.js";
 import { ToolError } from "./shared/errors.js";
 import type { SolanaConnections } from "./solana/config.js";
 import { getAddress, getAddressSignatures, getProgramAccounts, getToken, getTransaction } from "./solana/tools.js";
-import { addressInputSchema, addressSignaturesInputSchema, evmAddressInputSchema, evmAddressTransactionsInputSchema, evmContractInputSchema, evmListChainsInputSchema, evmTokenInputSchema, evmTraceTransactionInputSchema, evmTransactionInputSchema, programAccountsInputSchema, tokenInputSchema, transactionInputSchema } from "./types.js";
+import { addressInputSchema, addressSignaturesInputSchema, bridgeAddressActivityInputSchema, evmAddressInputSchema, evmAddressTransactionsInputSchema, evmContractInputSchema, evmListChainsInputSchema, evmTokenInputSchema, evmTraceTransactionInputSchema, evmTransactionInputSchema, programAccountsInputSchema, tokenInputSchema, transactionInputSchema } from "./types.js";
 
 function toolResponse(value: Record<string, unknown>) {
   return {
@@ -89,6 +90,11 @@ export function createServer(connections: SolanaConnections, evmClients: EvmClie
     "evm_list_chains",
     { title: "List EVM chain labels", description: "List accepted Chainstack tracing networks and provider-label aliases. Call this before choosing a network label when uncertain.", inputSchema: evmListChainsInputSchema.shape },
     async () => toolResponse(getEvmChains()),
+  );
+  server.registerTool(
+    "bridge_get_address_activity",
+    { title: "Get bridge address activity", description: "Get bridge activity for an EVM address from LI.FI Orders, Mayan Explorer, and Across. Returns normalized cross-chain source, destination, status, timestamps, and transaction hashes, with each provider's complete raw response.", inputSchema: bridgeAddressActivityInputSchema.shape },
+    async (input) => { try { return toolResponse(await getBridgeAddressActivity(input)); } catch (error) { return toolFailure(error); } },
   );
   server.registerTool(
     "evm_get_transaction",

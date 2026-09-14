@@ -45,6 +45,11 @@ export const evmChainSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).des
 const evmAddressSchema = z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("EVM address");
 
 export const evmListChainsInputSchema = z.object({});
+export const bridgeAddressActivityInputSchema = z.object({
+  address: evmAddressSchema.describe("EVM address to search in LI.FI Orders"),
+  limit: z.number().int().min(1).max(100).default(50).describe("Maximum LI.FI orders to return"),
+  offset: z.number().int().nonnegative().default(0).describe("LI.FI Orders pagination offset"),
+});
 export const evmAddressInputSchema = z.object({ address: evmAddressSchema, chain: evmChainSchema });
 export const evmTransactionInputSchema = z.object({ hash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).describe("EVM transaction hash"), chain: evmChainSchema });
 export const evmTraceTransactionInputSchema = z.object({

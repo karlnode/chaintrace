@@ -49,6 +49,7 @@ Configure an MCP client to run the compiled executable:
 - `solana_get_program_accounts({ programId, cluster?, filters?, dataSlice?, limit? })` returns program-owned accounts and raw account data. It supports Solana `dataSize`/`memcmp` RPC filters, optional data slicing, and returns at most 100 accounts by default (500 maximum). Use filters for large programs.
 - `evm_get_address({ address, chain })` returns an EVM address's native balance, nonce, EOA/contract classification, and raw RPC data.
 - `evm_list_chains()` lists Chaintrace's provider-label aliases and every Chainstack trace-enabled network label. Call it when choosing a `chain` label.
+- `bridge_get_address_activity({ address, limit?, offset? })` queries LI.FI Orders, Mayan Explorer, and Across for cross-chain activity involving an EVM address. It returns source/destination chains, assets, amounts, recipient, lifecycle timestamps, transaction hashes, status, and each provider's complete raw response. It is not an exhaustive history across every bridge.
 - `evm_get_transaction({ hash, chain })` returns a full EVM transaction and receipt; when Sourcify has a verified ABI, it decodes calldata and receipt events automatically.
 - `evm_trace_transaction({ hash, chain })` uses Chainstack's debug/trace RPC to return the complete execution trace and a compact list of internal calls, value transfers, creates, delegatecalls, and reverts. It is deliberately separate from `evm_get_transaction` because tracing is expensive and not supported on every Chainstack network.
 - `evm_get_address_transactions({ address, chain, direction?, maxCount?, pageKey? })` queries Alchemy's indexed Transfers API. It returns transfer hashes; inspect one with `evm_get_transaction`.
@@ -67,6 +68,10 @@ EVM tools require a `chain` label on every call. It is normally an Alchemy netwo
 `evm_get_address_transactions` requires an Alchemy endpoint because it uses `alchemy_getAssetTransfers`; all other EVM tools use standard EVM JSON-RPC methods. Its cross-chain default includes native external transfers and standard token transfers; Alchemy only supports internal-transfer data on a subset of networks.
 
 Sourcify lookups are automatic and use `https://sourcify.dev/server` by default. Set `SOURCIFY_SERVER_URL` to use a compatible self-hosted server. Unverified or unavailable Sourcify data never prevents raw EVM RPC results from being returned.
+
+### Bridge activity
+
+`bridge_get_address_activity` queries the public LI.FI Orders, Mayan Explorer, and Across endpoints in parallel; none requires an API key. One provider failing does not suppress results from the others. Set `LIFI_ORDERS_URL`, `MAYAN_EXPLORER_API_URL`, or `ACROSS_TRANSFERS_URL` only to point at compatible alternate endpoints. Use `offset` with `limit` to paginate; LI.FI is capped at 50 records per request because its Orders endpoint rejects higher limits, while Mayan and Across receive the requested limit (up to 100). Across uses cursor pagination and returns `nextCursor`; its first-page endpoint does not support the shared numeric offset.
 
 ### Chainstack `trace_transaction`
 
