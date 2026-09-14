@@ -5,6 +5,7 @@ import type { JsonRecord } from "../types.js";
 import { alchemyChainAliases, type EvmClients } from "./config.js";
 import { chainstackTraceChains, traceResult, type ChainstackTraceClient } from "./chainstack.js";
 import { getSourcifyContract } from "./sourcify.js";
+import { getEtherscanContract } from "./etherscan.js";
 
 const ERC20_ABI = [
   { type: "function", name: "name", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
@@ -165,14 +166,31 @@ function storageAddress(value: Hex): Address | null {
 }
 
 async function resolveSourcifyContract(client: unknown, chainId: string, contract: Address) {
-  let implementation: Address | null = null;
-  try {
-    implementation = storageAddress(await request<Hex>(client, "eth_getStorageAt", [contract, EIP1967_IMPLEMENTATION_SLOT, "latest"]));
-  } catch { /* Verification lookup remains useful even if a node does not expose storage. */ }
+  const implementation = await resolveImplementation(client, contract);
   const primary = await getSourcifyContract(chainId, implementation ?? contract);
   const fallback = implementation && !primary.abi ? await getSourcifyContract(chainId, contract) : null;
   const verified = primary.abi ? primary : fallback ?? primary;
   return { implementation, verified };
+}
+
+async function resolveImplementation(client: unknown, contract: Address) {
+  let implementation: Address | null = null;
+  try {
+    implementation = storageAddress(await request<Hex>(client, "eth_getStorageAt", [contract, EIP1967_IMPLEMENTATION_SLOT, "latest"]));
+  } catch { /* Verification lookup remains useful even if a node does not expose storage. */ }
+  return implementation;
+}
+
+async function resolveVerifiedContract(client: unknown, chainId: string, contract: Address) {
+  const implementation = await resolveImplementation(client, contract);
+  const etherscan = await getEtherscanContract(chainId, implementation ?? contract);
+  if (etherscan.abi) return { implementation, verified: etherscan, abiSource: "etherscan" as const, sourcify: null, etherscan };
+  const { verified: sourcify } = await resolveSourcifyContract(client, chainId, contract);
+  return { implementation, verified: sourcify, abiSource: sourcify.abi ? "sourcify" as const : null, sourcify, etherscan };
+}
+
+function verificationMetadata(value: unknown): JsonRecord {
+  return record(value) ?? {};
 }
 
 function asHex(value: unknown): Hex | null {
@@ -214,14 +232,14 @@ function decodeWithAbi(abi: Abi, transaction: JsonRecord, receipt: JsonRecord | 
 async function decodeEvmTransaction(client: unknown, chainId: string, transaction: JsonRecord, receipt: JsonRecord | null): Promise<JsonRecord> {
   const target = asHex(transaction.to) && typeof transaction.to === "string" && isAddress(transaction.to) ? getAddress(transaction.to) : null;
   if (!target) return { available: false, reason: "Transaction creates a contract or has no destination address." };
-  const { implementation, verified } = await resolveSourcifyContract(client, chainId, target);
+  const { implementation, verified, abiSource } = await resolveVerifiedContract(client, chainId, target);
   if (!verified.abi) {
     return { available: false, reason: verified.error ?? "No verified Sourcify ABI found for the destination contract.", contractAddress: target, proxyImplementation: implementation };
   }
-  return decodeWithAbi(verified.abi, transaction, receipt, implementation ?? target, implementation);
+  return { ...decodeWithAbi(verified.abi, transaction, receipt, implementation ?? target, implementation), abiSource };
 }
 
-export async function getEvmContract(clients: EvmClients, input: { address: string; chain: string }): Promise<JsonRecord> {
+export async function getEvmContractInfo(clients: EvmClients, input: { address: string; chain: string }): Promise<JsonRecord> {
   const contract = address(input.address, "address");
   try {
     const { client, chainId, rawChainId } = await context(clients, input.chain);
@@ -231,26 +249,29 @@ export async function getEvmContract(clients: EvmClients, input: { address: stri
     ]);
     if (code === "0x") throw new ToolError(`${contract} has no deployed code and is not a contract.`, "NOT_A_CONTRACT");
     const implementation = storageAddress(implementationSlot);
-    const verified = await getSourcifyContract(chainId, implementation ?? contract);
+    const verified = await resolveVerifiedContract(client, chainId, contract);
     return {
       chain: input.chain, chainId, address: contract,
-      contract: { codeSizeBytes: (code.length - 2) / 2, proxy: implementation ? { standard: "eip-1967", implementation } : null },
-      sourcify: { verified: verified.found, abiAvailable: verified.abi !== null, metadataAvailable: verified.metadata !== null, sourcesAvailable: verified.sources !== null, error: verified.error },
-      raw: { chainId: rawChainId, code, eip1967ImplementationSlot: implementationSlot },
+      contract: { codeSizeBytes: (code.length - 2) / 2, proxy: implementation ? { standard: "eip-1967", implementation } : null, ...verificationMetadata(verified.etherscan.metadata) },
+      verification: { source: verified.abiSource, etherscan: { verified: verified.etherscan.found, error: verified.etherscan.error }, sourcify: verified.sourcify ? { verified: verified.sourcify.found, error: verified.sourcify.error } : null },
+      raw: { chainId: rawChainId, code, eip1967ImplementationSlot: implementationSlot, etherscan: verified.etherscan.raw, sourcify: verified.sourcify?.raw ?? null },
     };
   } catch (error) { throw asEvmError(error); }
 }
 
-export async function getEvmContractInfo(clients: EvmClients, input: { address: string; chain: string }): Promise<JsonRecord> {
+export async function getEvmVerifiedContract(clients: EvmClients, input: { address: string; chain: string }): Promise<JsonRecord> {
   const contract = address(input.address, "address");
   try {
     const { client, chainId, rawChainId } = await context(clients, input.chain);
-    const { implementation, verified } = await resolveSourcifyContract(client, chainId, contract);
+    const { implementation, verified, abiSource, sourcify, etherscan } = await resolveVerifiedContract(client, chainId, contract);
     return {
       chain: input.chain, chainId, address: contract, lookupAddress: implementation ?? contract,
       proxyImplementation: implementation,
-      sourcify: { verified: verified.found, abi: verified.abi, metadata: verified.metadata, sources: verified.sources, error: verified.error },
-      raw: { chainId: rawChainId, sourcify: verified.raw },
+      contract: verificationMetadata(etherscan.metadata ?? sourcify?.metadata),
+      sourcify: sourcify ? { verified: sourcify.found, abi: sourcify.abi, metadata: sourcify.metadata, sources: sourcify.sources, error: sourcify.error } : null,
+      etherscan: { verified: etherscan.found, abi: etherscan.abi, metadata: etherscan.metadata, sources: etherscan.sources, error: etherscan.error },
+      verification: { source: abiSource },
+      raw: { chainId: rawChainId, sourcify: sourcify?.raw ?? null, etherscan: etherscan.raw },
     };
   } catch (error) { throw asEvmError(error); }
 }

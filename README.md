@@ -54,8 +54,8 @@ Configure an MCP client to run the compiled executable:
 - `evm_trace_transaction({ hash, chain })` uses Chainstack's debug/trace RPC to return the complete execution trace and a compact list of internal calls, value transfers, creates, delegatecalls, and reverts. It is deliberately separate from `evm_get_transaction` because tracing is expensive and not supported on every Chainstack network.
 - `evm_get_address_transactions({ address, chain, direction?, maxCount?, pageKey? })` queries Alchemy's indexed Transfers API. It returns transfer hashes; inspect one with `evm_get_transaction`.
 - `evm_get_token({ address, chain })` returns standard ERC-20 name, symbol, decimals, and supply when supported by the contract.
-- `evm_get_contract({ address, chain })` returns deployed code size, EIP-1967 implementation-proxy detection, and a Sourcify verification summary.
-- `evm_get_contract_info({ address, chain })` returns full verified ABI, metadata, and source information from Sourcify, resolving an EIP-1967 implementation first.
+- `evm_get_contract_info({ address, chain })` returns deployed code size, contract/compiler metadata, EIP-1967 implementation-proxy detection, and verification status without ABI or source code.
+- `evm_get_verified_contract({ address, chain })` returns complete contract/compiler metadata, verified ABI, and source information from Etherscan or Sourcify, resolving an EIP-1967 implementation first.
 
 `cluster` is `mainnet-beta` by default and may be `devnet`. All loss-prone integer values are JSON strings. Where Solana supplies `blockTime`, results include both the Unix-seconds value and `blockTimeUtc` as an ISO-8601 UTC timestamp. Each successful result has a `raw` object containing the relevant JSON-RPC records; raw binary account data is base64 encoded.
 
@@ -67,7 +67,7 @@ EVM tools require a `chain` label on every call. It is normally an Alchemy netwo
 
 `evm_get_address_transactions` requires an Alchemy endpoint because it uses `alchemy_getAssetTransfers`; all other EVM tools use standard EVM JSON-RPC methods. Its cross-chain default includes native external transfers and standard token transfers; Alchemy only supports internal-transfer data on a subset of networks.
 
-Sourcify lookups are automatic and use `https://sourcify.dev/server` by default. Set `SOURCIFY_SERVER_URL` to use a compatible self-hosted server. Unverified or unavailable Sourcify data never prevents raw EVM RPC results from being returned.
+Sourcify lookups are automatic and use `https://sourcify.dev/server` by default. Set `SOURCIFY_SERVER_URL` to use a compatible self-hosted server. When Sourcify has no ABI, contract ABI/source lookups fall back to Etherscan's multichain API using `ETHERSCAN_API_KEY` (optionally `ETHERSCAN_API_URL`). Unverified or unavailable verification data never prevents raw EVM RPC results from being returned.
 
 ### Bridge activity
 

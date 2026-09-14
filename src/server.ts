@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createEvmClients, type EvmClients } from "./evm/config.js";
 import { getBridgeAddressActivity } from "./bridge/tools.js";
 import { createChainstackTraceClient, type ChainstackTraceClient } from "./evm/chainstack.js";
-import { getEvmAddress, getEvmAddressTransactions, getEvmChains, getEvmContract, getEvmContractInfo, getEvmToken, getEvmTraceTransaction, getEvmTransaction } from "./evm/tools.js";
+import { getEvmAddress, getEvmAddressTransactions, getEvmChains, getEvmContractInfo, getEvmToken, getEvmTraceTransaction, getEvmTransaction, getEvmVerifiedContract } from "./evm/tools.js";
 import { ToolError } from "./shared/errors.js";
 import type { SolanaConnections } from "./solana/config.js";
 import { getAddress, getAddressSignatures, getProgramAccounts, getToken, getTransaction } from "./solana/tools.js";
@@ -117,14 +117,14 @@ export function createServer(connections: SolanaConnections, evmClients: EvmClie
     async (input) => { try { return toolResponse(await getEvmToken(evmClients, input)); } catch (error) { return toolFailure(error); } },
   );
   server.registerTool(
-    "evm_get_contract",
-    { title: "Get EVM contract", description: "Get contract bytecode details, EIP-1967 implementation-proxy detection, and a Sourcify verification summary.", inputSchema: evmContractInputSchema.shape },
-    async (input) => { try { return toolResponse(await getEvmContract(evmClients, input)); } catch (error) { return toolFailure(error); } },
+    "evm_get_contract_info",
+    { title: "Get EVM contract info", description: "Get contract bytecode, name/compiler metadata, EIP-1967 proxy details, and verification status without ABI or source code.", inputSchema: evmContractInputSchema.shape },
+    async (input) => { try { return toolResponse(await getEvmContractInfo(evmClients, input)); } catch (error) { return toolFailure(error); } },
   );
   server.registerTool(
-    "evm_get_contract_info",
-    { title: "Get EVM contract info", description: "Get full verified contract ABI, metadata, and source information from Sourcify. Resolves EIP-1967 implementations first.", inputSchema: evmContractInputSchema.shape },
-    async (input) => { try { return toolResponse(await getEvmContractInfo(evmClients, input)); } catch (error) { return toolFailure(error); } },
+    "evm_get_verified_contract",
+    { title: "Get verified EVM contract", description: "Get complete contract information including name/compiler metadata, ABI, and verified source code from Etherscan or Sourcify. Resolves EIP-1967 implementations first.", inputSchema: evmContractInputSchema.shape },
+    async (input) => { try { return toolResponse(await getEvmVerifiedContract(evmClients, input)); } catch (error) { return toolFailure(error); } },
   );
   return server;
 }

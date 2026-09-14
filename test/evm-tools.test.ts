@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EvmClients } from "../src/evm/config.js";
 import type { ChainstackTraceClient } from "../src/evm/chainstack.js";
-import { getEvmAddress, getEvmAddressTransactions, getEvmContract, getEvmContractInfo, getEvmToken, getEvmTraceTransaction, getEvmTransaction } from "../src/evm/tools.js";
+import { getEvmAddress, getEvmAddressTransactions, getEvmContractInfo, getEvmToken, getEvmTraceTransaction, getEvmTransaction, getEvmVerifiedContract } from "../src/evm/tools.js";
 
 const address = "0x000000000000000000000000000000000000dEaD";
 const hash = `0x${"a".repeat(64)}`;
@@ -48,7 +48,7 @@ describe("EVM tool handlers", () => {
 
   it("detects an EIP-1967 implementation address", async () => {
     const implementation = "000000000000000000000000000000000000beef";
-    const result = await getEvmContract(clients((method) => ({ eth_chainId: "0x1", eth_getCode: "0x6000", eth_getStorageAt: `0x000000000000000000000000${implementation}` } as Record<string, unknown>)[method]), { address, chain: "robinhood-mainnet" });
+    const result = await getEvmContractInfo(clients((method) => ({ eth_chainId: "0x1", eth_getCode: "0x6000", eth_getStorageAt: `0x000000000000000000000000${implementation}` } as Record<string, unknown>)[method]), { address, chain: "robinhood-mainnet" });
     expect(result).toMatchObject({ contract: { proxy: { standard: "eip-1967", implementation: "0x000000000000000000000000000000000000bEEF" } } });
   });
 
@@ -66,7 +66,17 @@ describe("EVM tool handlers", () => {
 
   it("returns full Sourcify contract information", async () => {
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ abi: [], metadata: { compiler: "solc" }, sources: { "Contract.sol": { content: "contract Contract {}" } } }), { status: 200 }));
-    const result = await getEvmContractInfo(clients((method) => ({ eth_chainId: "0x1", eth_getStorageAt: `0x${"0".repeat(64)}` } as Record<string, unknown>)[method]), { address, chain: "shape-mainnet" });
+    const result = await getEvmVerifiedContract(clients((method) => ({ eth_chainId: "0x1", eth_getStorageAt: `0x${"0".repeat(64)}` } as Record<string, unknown>)[method]), { address, chain: "shape-mainnet" });
     expect(result).toMatchObject({ lookupAddress: address, sourcify: { verified: true, abi: [], metadata: { compiler: "solc" } } });
+  });
+
+  it("falls back to Etherscan for ABI and wrapped source code", async () => {
+    vi.stubEnv("ETHERSCAN_API_KEY", "test-key");
+    const sourceCode = JSON.stringify({ language: "Solidity", sources: { "Contract.sol": { content: "contract Contract {}" } }, settings: {} });
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "1", message: "OK", result: [{ ABI: JSON.stringify([{ type: "function", name: "ping", inputs: [], outputs: [] }]), SourceCode: `{${sourceCode}}`, ContractName: "Contract", CompilerVersion: "v0.8.0" }] }), { status: 200 })));
+    const result = await getEvmVerifiedContract(clients((method) => ({ eth_chainId: "0x38", eth_getStorageAt: `0x${"0".repeat(64)}` } as Record<string, unknown>)[method]), { address, chain: "bsc-mainnet" });
+    expect(result).toMatchObject({ verification: { source: "etherscan" }, etherscan: { abi: [{ name: "ping" }], sources: { "Contract.sol": { content: "contract Contract {}" } }, metadata: { contractName: "Contract" } } });
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain("chainid=56");
   });
 });
