@@ -65,3 +65,9 @@ export const evmAddressTransactionsInputSchema = z.object({
 });
 export const evmTokenInputSchema = z.object({ address: evmAddressSchema, chain: evmChainSchema });
 export const evmContractInputSchema = z.object({ address: evmAddressSchema, chain: evmChainSchema });
+export const evmDecompileInputSchema = z.object({
+  address: evmAddressSchema,
+  chain: evmChainSchema,
+  format: z.enum(["solidity", "yul"]).default("solidity").describe("Heimdall output format"),
+  timeoutMs: z.number().int().min(1000).max(120000).default(30000).describe("Heimdall symbolic-execution timeout in milliseconds"),
+});

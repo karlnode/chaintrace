@@ -13,7 +13,7 @@ describe("MCP server", () => {
     await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
     const tools = await client.listTools();
     expect(tools.tools.map((tool) => tool.name).sort()).toEqual([
-      "bridge_get_address_activity", "evm_get_address", "evm_get_address_transactions", "evm_get_contract_info", "evm_get_token", "evm_get_transaction", "evm_get_verified_contract", "evm_list_chains", "evm_trace_transaction",
+      "bridge_get_address_activity", "evm_decompile", "evm_get_address", "evm_get_address_transactions", "evm_get_contract_info", "evm_get_token", "evm_get_transaction", "evm_get_verified_contract", "evm_list_chains", "evm_trace_transaction",
       "solana_get_address", "solana_get_address_signatures", "solana_get_program_accounts", "solana_get_token", "solana_get_transaction",
     ]);
     await Promise.all([client.close(), server.close()]);

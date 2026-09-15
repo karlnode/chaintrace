@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EvmClients } from "../src/evm/config.js";
 import type { ChainstackTraceClient } from "../src/evm/chainstack.js";
 import { getEvmAddress, getEvmAddressTransactions, getEvmContractInfo, getEvmToken, getEvmTraceTransaction, getEvmTransaction, getEvmVerifiedContract } from "../src/evm/tools.js";
+import { getEvmDecompiledContract } from "../src/evm/heimdall.js";
 
 const address = "0x000000000000000000000000000000000000dEaD";
 const hash = `0x${"a".repeat(64)}`;
@@ -15,6 +16,20 @@ describe("EVM tool handlers", () => {
   it("gets address details and resolves the chain ID from RPC", async () => {
     const result = await getEvmAddress(clients((method) => ({ eth_chainId: "0x2a", eth_getBalance: "0xde0b6b3a7640000", eth_getTransactionCount: "0x3", eth_getCode: "0x6000" } as Record<string, unknown>)[method]), { address, chain: "shape-mainnet" });
     expect(result).toMatchObject({ chain: "shape-mainnet", chainId: "42", account: { type: "contract", balanceWei: "1000000000000000000", nonce: "3" } });
+  });
+
+  it("runs Heimdall and separates ABI, source, and diagnostics", async () => {
+    let called: { binary: string; args: string[] } | undefined;
+    const result = await getEvmDecompiledContract(
+      { address, chain: "eth-mainnet", format: "solidity", timeoutMs: 5000 },
+      { HEIMDALL_PATH: "/custom/heimdall", HEIMDALL_RPC_URL: "https://rpc.example" },
+      async (binary, args) => {
+        called = { binary, args };
+        return { stdout: "warning\nABI:\n[{\"type\":\"function\",\"name\":\"ping\"}]\nSource:\ncontract Decompiled {}\n", stderr: "" };
+      },
+    );
+    expect(called).toMatchObject({ binary: "/custom/heimdall", args: expect.arrayContaining(["--include-sol", "--rpc-url", "https://rpc.example"]) });
+    expect(result).toMatchObject({ provider: "heimdall", abi: [{ name: "ping" }], source: "contract Decompiled {}", diagnostics: "warning" });
   });
 
   it("gets a transaction and receipt", async () => {

@@ -56,6 +56,7 @@ Configure an MCP client to run the compiled executable:
 - `evm_get_token({ address, chain })` returns standard ERC-20 name, symbol, decimals, and supply when supported by the contract.
 - `evm_get_contract_info({ address, chain })` returns deployed code size, contract/compiler metadata, EIP-1967 implementation-proxy detection, and verification status without ABI or source code.
 - `evm_get_verified_contract({ address, chain })` returns complete contract/compiler metadata, verified ABI, and source information from Etherscan or Sourcify, resolving an EIP-1967 implementation first.
+- `evm_decompile({ address, chain, format?, timeoutMs? })` runs the locally installed Heimdall CLI against deployed bytecode and returns heuristic ABI plus Solidity or Yul output. Set `HEIMDALL_PATH` when `heimdall` is not on `PATH`; it uses `HEIMDALL_RPC_URL` when set, otherwise the configured Alchemy endpoint.
 
 `cluster` is `mainnet-beta` by default and may be `devnet`. All loss-prone integer values are JSON strings. Where Solana supplies `blockTime`, results include both the Unix-seconds value and `blockTimeUtc` as an ISO-8601 UTC timestamp. Each successful result has a `raw` object containing the relevant JSON-RPC records; raw binary account data is base64 encoded.
 

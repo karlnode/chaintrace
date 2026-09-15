@@ -3,10 +3,11 @@ import { createEvmClients, type EvmClients } from "./evm/config.js";
 import { getBridgeAddressActivity } from "./bridge/tools.js";
 import { createChainstackTraceClient, type ChainstackTraceClient } from "./evm/chainstack.js";
 import { getEvmAddress, getEvmAddressTransactions, getEvmChains, getEvmContractInfo, getEvmToken, getEvmTraceTransaction, getEvmTransaction, getEvmVerifiedContract } from "./evm/tools.js";
+import { getEvmDecompiledContract } from "./evm/heimdall.js";
 import { ToolError } from "./shared/errors.js";
 import type { SolanaConnections } from "./solana/config.js";
 import { getAddress, getAddressSignatures, getProgramAccounts, getToken, getTransaction } from "./solana/tools.js";
-import { addressInputSchema, addressSignaturesInputSchema, bridgeAddressActivityInputSchema, evmAddressInputSchema, evmAddressTransactionsInputSchema, evmContractInputSchema, evmListChainsInputSchema, evmTokenInputSchema, evmTraceTransactionInputSchema, evmTransactionInputSchema, programAccountsInputSchema, tokenInputSchema, transactionInputSchema } from "./types.js";
+import { addressInputSchema, addressSignaturesInputSchema, bridgeAddressActivityInputSchema, evmAddressInputSchema, evmAddressTransactionsInputSchema, evmContractInputSchema, evmDecompileInputSchema, evmListChainsInputSchema, evmTokenInputSchema, evmTraceTransactionInputSchema, evmTransactionInputSchema, programAccountsInputSchema, tokenInputSchema, transactionInputSchema } from "./types.js";
 
 function toolResponse(value: Record<string, unknown>) {
   return {
@@ -125,6 +126,11 @@ export function createServer(connections: SolanaConnections, evmClients: EvmClie
     "evm_get_verified_contract",
     { title: "Get verified EVM contract", description: "Get complete contract information including name/compiler metadata, ABI, and verified source code from Etherscan or Sourcify. Resolves EIP-1967 implementations first.", inputSchema: evmContractInputSchema.shape },
     async (input) => { try { return toolResponse(await getEvmVerifiedContract(evmClients, input)); } catch (error) { return toolFailure(error); } },
+  );
+  server.registerTool(
+    "evm_decompile",
+    { title: "Decompile EVM contract", description: "Run the locally installed Heimdall decompiler against deployed EVM bytecode. Returns recovered ABI, decompiled Solidity or Yul, diagnostics, and raw CLI output. Results are heuristic and may be invalid or incomplete.", inputSchema: evmDecompileInputSchema.shape },
+    async (input) => { try { return toolResponse(await getEvmDecompiledContract(input)); } catch (error) { return toolFailure(error); } },
   );
   return server;
 }
