@@ -63,7 +63,7 @@ Solana fund-flow tracing and program bytecode analysis can be added as separate 
 
 ## EVM configuration
 
-EVM tools require a `chain` label on every call. It is normally an Alchemy network slug, not a hard-coded registry: Chaintrace builds `https://<chain>.g.alchemy.com/v2/<ALCHEMY_API_KEY>`. For example, `chain: "robinhood-mainnet"` uses `https://robinhood-mainnet.g.alchemy.com/v2/...`; `chain: "shape-mainnet"` works the same way. Common BNB Smart Chain labels (`bsc-mainnet`, `bsc`, and `binance-smart-chain`) are automatically normalized to Alchemy's `bnb-mainnet`. Use `evm_list_chains` for the current aliases and Chainstack trace labels. The RPC endpoint supplies the authoritative chain ID through `eth_chainId`, and every response includes it.
+EVM tools require a `chain` label that exactly matches one of Alchemy's supported EVM HTTP network slugs. Chaintrace builds `https://<chain>.g.alchemy.com/v2/<ALCHEMY_API_KEY>` and rejects aliases or unknown slugs before making an RPC request. Use `evm_list_chains` to see the complete local allowlist and Chainstack trace labels. The RPC endpoint supplies the authoritative chain ID through `eth_chainId`, and every response includes it.
 
 `evm_get_address_transactions` requires an Alchemy endpoint because it uses `alchemy_getAssetTransfers`; all other EVM tools use standard EVM JSON-RPC methods. Its cross-chain default includes native external transfers and standard token transfers; Alchemy only supports internal-transfer data on a subset of networks.
 

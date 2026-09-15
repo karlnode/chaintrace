@@ -2,7 +2,7 @@ import { decodeEventLog, decodeFunctionData, decodeFunctionResult, encodeFunctio
 import { ToolError } from "../shared/errors.js";
 import { jsonSafe } from "../shared/json.js";
 import type { JsonRecord } from "../types.js";
-import { alchemyChainAliases, type EvmClients } from "./config.js";
+import { alchemyChainSlugs, type EvmClients } from "./config.js";
 import { chainstackTraceChains, traceResult, type ChainstackTraceClient } from "./chainstack.js";
 import { getSourcifyContract } from "./sourcify.js";
 import { getEtherscanContract } from "./etherscan.js";
@@ -46,7 +46,7 @@ export function getEvmChains(): JsonRecord {
   return {
     alchemy: {
       chainInput: "Use Alchemy's network slug (for example bnb-mainnet). Other valid Alchemy slugs are passed through without a hard-coded registry and verified with eth_chainId.",
-      aliases: alchemyChainAliases(),
+      slugs: alchemyChainSlugs(),
     },
     chainstackTrace: {
       chainInput: "Use one of these labels with evm_trace_transaction. It selects the appropriate Chainstack endpoint and trace method.",
